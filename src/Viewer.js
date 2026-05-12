@@ -445,7 +445,6 @@ export function Viewer() {
   addExportObjTextureButton(this);
 }
 
-// Extra UI functions at bottom so they’re still available for re-calling elsewhere
 function addExportObjTextureButton(viewer) {
   let controls = document.getElementById("controls");
   if (!controls) {
@@ -465,12 +464,61 @@ function addExportObjTextureButton(viewer) {
   }
 
   exportBtn.onclick = function() {
-    // Expect "currentRoomMesh" and "currentRoomTexture" to be attached when loading rooms (see .mpd loader above)
+    // Grab mesh and texture assignment
     const mesh = viewer.currentRoomMesh || null;
     const tex = viewer.currentRoomTexture || (mesh && mesh.texture) || null;
     let valid = mesh && mesh.vertices && mesh.faces && mesh.uvs && (tex || mesh.texture);
+
+    // LOGGING SECTION
+    console.log("=== BEGIN STEAMVR OBJ EXPORT DEBUG LOG ===");
+    console.log("viewer.currentRoomMesh:", viewer.currentRoomMesh);
+    console.log("viewer.currentRoomTexture:", viewer.currentRoomTexture);
+    if (mesh) {
+      console.log("mesh type:", mesh.constructor ? mesh.constructor.name : typeof mesh);
+      console.log("mesh keys:", Object.keys(mesh));
+      if (mesh.geometry) {
+        console.log("mesh.geometry keys:", Object.keys(mesh.geometry));
+        if (mesh.geometry.attributes) {
+          console.log("geometry.attributes:", Object.keys(mesh.geometry.attributes));
+          if (mesh.geometry.attributes.position) {
+            console.log("position attr length:", mesh.geometry.attributes.position.count);
+          }
+          if (mesh.geometry.attributes.uv) {
+            console.log("uv attr length:", mesh.geometry.attributes.uv.count);
+          }
+        }
+        if (mesh.geometry.index) {
+          console.log("geometry.index count:", mesh.geometry.index.count);
+        }
+      }
+      if (mesh.vertices) {
+        console.log("mesh.vertices sample:", mesh.vertices.slice(0,3));
+      }
+      if (mesh.faces) {
+        console.log("mesh.faces sample:", mesh.faces.slice(0,3));
+      }
+      if (mesh.uvs) {
+        console.log("mesh.uvs sample:", mesh.uvs.slice(0,3));
+      }
+    } else {
+      console.log("NO mesh loaded!");
+    }
+    if (tex) {
+      console.log("texture type:", tex.constructor ? tex.constructor.name : typeof tex);
+      console.log("texture keys:", Object.keys(tex));
+      if (tex.width && tex.height) {
+        console.log("texture size:", tex.width, tex.height);
+      }
+      if (tex.data) {
+        console.log("texture.data length:", tex.data.length);
+      }
+    } else {
+      console.log("NO texture loaded!");
+    }
+    // END LOGGING SECTION
+
     if (!valid) {
-      alert("No usable mesh or texture loaded!");
+      alert("No usable mesh or texture loaded! See browser console for details.");
       return;
     }
     // Attach texture if not already present on mesh
