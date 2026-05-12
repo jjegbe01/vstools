@@ -471,4 +471,11 @@ function addExportObjTextureButton(viewer) {
     let valid = mesh && mesh.vertices && mesh.faces && mesh.uvs && (tex || mesh.texture);
     if (!valid) {
       alert("No usable mesh or texture loaded!");
-      return
+      return;
+    }
+    // Attach texture if not already present on mesh
+    if (!mesh.texture && tex) mesh.texture = tex;
+    let roomName = viewer.currentRoomName || 'VSRoom';
+    exportObjWithTexture(mesh, roomName);
+  };
+}
