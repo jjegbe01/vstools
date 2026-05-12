@@ -27,6 +27,9 @@ import { FBT } from './FBT.js';
 import { cloneMeshWithPose, exportPng, parseExt } from './VSTOOLS.js';
 import { initUiPanel } from './ui/ui-panel.js';
 
+// ADD THIS:
+import { exportObjWithTexture } from "./export-obj-texture.js";
+
 export function Viewer() {
   const scene = (this.scene = new Scene());
   const camera = new PerspectiveCamera(75, 1, 0.1, 10000);
@@ -215,7 +218,14 @@ export function Viewer() {
 
     if (activeZND) updateTextures(activeZND.textures);
     updateSettings();
-  };
+
+    // --- Add OBJ+Texture export hook for MPD ---
+    this.currentRoomMesh = mpd.mesh;
+    // If you have texture info on MPD, attach it similarly:
+    if (activeZND && activeZND.textures && activeZND.textures[0])
+      this.currentRoomTexture = activeZND.textures[0].image;
+    this.currentRoomName = 'VSRoom';
+  }.bind(this);
 
   loaders.arm = function (reader) {
     clean();
@@ -430,4 +440,35 @@ export function Viewer() {
     window.open(objectURL, '_blank');
     window.focus();
   }
+
+  // ---- OBJ+TEXTURE EXPORT BUTTON HOOK ----
+  addExportObjTextureButton(this);
 }
+
+// Extra UI functions at bottom so they’re still available for re-calling elsewhere
+function addExportObjTextureButton(viewer) {
+  let controls = document.getElementById("controls");
+  if (!controls) {
+    controls = document.createElement("div");
+    controls.id = "controls";
+    controls.style.marginBottom = "1em";
+    document.body.insertBefore(controls, document.body.firstChild);
+  }
+
+  let exportBtn = document.getElementById("export-obj-texture-btn");
+  if (!exportBtn) {
+    exportBtn = document.createElement("button");
+    exportBtn.id = "export-obj-texture-btn";
+    exportBtn.textContent = "Export OBJ + Texture (SteamVR)";
+    exportBtn.style.marginRight = "1em";
+    controls.appendChild(exportBtn);
+  }
+
+  exportBtn.onclick = function() {
+    // Expect "currentRoomMesh" and "currentRoomTexture" to be attached when loading rooms (see .mpd loader above)
+    const mesh = viewer.currentRoomMesh || null;
+    const tex = viewer.currentRoomTexture || (mesh && mesh.texture) || null;
+    let valid = mesh && mesh.vertices && mesh.faces && mesh.uvs && (tex || mesh.texture);
+    if (!valid) {
+      alert("No usable mesh or texture loaded!");
+      return
