@@ -445,6 +445,59 @@ export function Viewer() {
   addExportObjTextureButton(this);
 }
 
+function findFirstMeshWithGeometry(obj3d) {
+  if (!obj3d) return null;
+  if (obj3d.type === "Mesh" && obj3d.geometry) return obj3d;
+
+  for (const child of obj3d.children || []) {
+    const found = findFirstMeshWithGeometry(child);
+    if (found) return found;
+  }
+  return null;
+}
+
+// Converts a Three.js Mesh to a simple mesh for export
+function adaptThreeMesh(mesh, texture) {
+  const geometry = mesh.geometry;
+  const pos = geometry.attributes.position;
+  const uv = geometry.attributes.uv;
+  const idx = geometry.index;
+  let vertices = [];
+  let uvs = [];
+  let faces = [];
+
+  console.log("--- Adapt mesh ---");
+  if (!pos) throw new Error("No position attribute on geometry!");
+  for (let i = 0; i < pos.count; ++i) {
+    vertices.push([pos.getX(i), pos.getY(i), pos.getZ(i)]);
+    uvs.push(uv ? [uv.getX(i), uv.getY(i)] : [0, 0]);
+  }
+
+  if (idx) {
+    for (let i = 0; i < idx.count; i += 3) {
+      faces.push({
+        v0: idx.getX(i),
+        uv0: idx.getX(i),
+        v1: idx.getX(i + 1),
+        uv1: idx.getX(i + 1),
+        v2: idx.getX(i + 2),
+        uv2: idx.getX(i + 2),
+      });
+    }
+  } else {
+    for (let i = 0; i < pos.count; i += 3) {
+      faces.push({
+        v0: i, uv0: i,
+        v1: i + 1, uv1: i + 1,
+        v2: i + 2, uv2: i + 2,
+      });
+    }
+  }
+
+  console.log("adapted mesh: vertices", vertices.length, "uvs", uvs.length, "faces", faces.length);
+  return { vertices, uvs, faces, texture };
+}
+
 function addExportObjTextureButton(viewer) {
   let controls = document.getElementById("controls");
   if (!controls) {
@@ -463,67 +516,30 @@ function addExportObjTextureButton(viewer) {
     controls.appendChild(exportBtn);
   }
 
-  exportBtn.onclick = function() {
-    // Grab mesh and texture assignment
-    const mesh = viewer.currentRoomMesh || null;
-    const tex = viewer.currentRoomTexture || (mesh && mesh.texture) || null;
-    let valid = mesh && mesh.vertices && mesh.faces && mesh.uvs && (tex || mesh.texture);
-
-    // LOGGING SECTION
-    console.log("=== BEGIN STEAMVR OBJ EXPORT DEBUG LOG ===");
-    console.log("viewer.currentRoomMesh:", viewer.currentRoomMesh);
-    console.log("viewer.currentRoomTexture:", viewer.currentRoomTexture);
-    if (mesh) {
-      console.log("mesh type:", mesh.constructor ? mesh.constructor.name : typeof mesh);
-      console.log("mesh keys:", Object.keys(mesh));
-      if (mesh.geometry) {
-        console.log("mesh.geometry keys:", Object.keys(mesh.geometry));
-        if (mesh.geometry.attributes) {
-          console.log("geometry.attributes:", Object.keys(mesh.geometry.attributes));
-          if (mesh.geometry.attributes.position) {
-            console.log("position attr length:", mesh.geometry.attributes.position.count);
-          }
-          if (mesh.geometry.attributes.uv) {
-            console.log("uv attr length:", mesh.geometry.attributes.uv.count);
-          }
-        }
-        if (mesh.geometry.index) {
-          console.log("geometry.index count:", mesh.geometry.index.count);
-        }
-      }
-      if (mesh.vertices) {
-        console.log("mesh.vertices sample:", mesh.vertices.slice(0,3));
-      }
-      if (mesh.faces) {
-        console.log("mesh.faces sample:", mesh.faces.slice(0,3));
-      }
-      if (mesh.uvs) {
-        console.log("mesh.uvs sample:", mesh.uvs.slice(0,3));
-      }
-    } else {
-      console.log("NO mesh loaded!");
-    }
-    if (tex) {
-      console.log("texture type:", tex.constructor ? tex.constructor.name : typeof tex);
-      console.log("texture keys:", Object.keys(tex));
-      if (tex.width && tex.height) {
-        console.log("texture size:", tex.width, tex.height);
-      }
-      if (tex.data) {
-        console.log("texture.data length:", tex.data.length);
-      }
-    } else {
-      console.log("NO texture loaded!");
-    }
-    // END LOGGING SECTION
-
-    if (!valid) {
+    exportBtn.onclick = function() {
+    // Try to find a mesh with geometry
+    let baseObj = viewer.currentRoomMesh || null;
+    let tex = viewer.currentRoomTexture || (baseObj && baseObj.texture) || null;
+    let mesh = findFirstMeshWithGeometry(baseObj);
+  
+    console.log("OBJ export/adapter: baseObj:", baseObj);
+    console.log("OBJ export/adapter: mesh after find:", mesh);
+    console.log("OBJ export/adapter: texture:", tex);
+  
+    if (!mesh || !tex) {
       alert("No usable mesh or texture loaded! See browser console for details.");
       return;
     }
-    // Attach texture if not already present on mesh
-    if (!mesh.texture && tex) mesh.texture = tex;
+    // Adapt Three.js Mesh to flat mesh for exporter
+    let exportMesh;
+    try {
+      exportMesh = adaptThreeMesh(mesh, tex);
+    } catch (e) {
+      alert("Error adapting mesh: " + e.message);
+      console.error(e);
+      return;
+    }
     let roomName = viewer.currentRoomName || 'VSRoom';
-    exportObjWithTexture(mesh, roomName);
+    exportObjWithTexture(exportMesh, roomName);
   };
 }
